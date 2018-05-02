@@ -23,21 +23,36 @@ func main() {
 
 	client := pb.NewAuthClient("go.micro.srv.user", microclient.DefaultClient)
 
+	r, err := client.CreateMenu(context.TODO(), &pb.Menu{
+		Id:   "1",
+		Name: "inicio",
+		Url:  "/dashboard",
+	})
+	r1, err := client.CreateMenu(context.TODO(), &pb.Menu{
+		Id:   "2",
+		Name: "inicio",
+		Url:  "/dashboard",
+	})
+	r2, err := client.CreateRole(context.TODO(), &pb.Role{
+		Id:     "2",
+		Name:   "admin",
+		Menues: []*pb.Menu{r.Menu, r1.Menu},
+	})
 	name := "Ewan Valentine"
 	email := "ewan.valentine89@gmail.com"
 	password := "test123"
 	company := "BBC"
-
-	r, err := client.Create(context.TODO(), &pb.User{
+	r3, err := client.Create(context.TODO(), &pb.User{
 		Name:     name,
 		Email:    email,
 		Password: password,
 		Company:  company,
+		Roles:    []*pb.Role{r2.Role},
 	})
 	if err != nil {
 		log.Fatalf("Could not create: %v", err)
 	}
-	log.Printf("Created: %s", r.User.Id)
+	log.Printf("Created: %s", r3.User.Id)
 
 	getAll, err := client.GetAll(context.Background(), &pb.Request{})
 	if err != nil {
