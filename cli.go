@@ -28,13 +28,13 @@ func main() {
 		Name: "inicio",
 		Url:  "/dashboard",
 	})
-	println("Create menu 1", err)
+	println("Create menu 1", err.Error)
 	r1, err := client.CreateMenu(context.TODO(), &pb.Menu{
 		Id:   "2",
 		Name: "inicio",
 		Url:  "/dashboard",
 	})
-	println("Create menu 2", err)
+	println("Create menu 2", err.Error)
 	r2, err := client.CreateRole(context.TODO(), &pb.Role{
 		Id:     "2",
 		Name:   "admin",
