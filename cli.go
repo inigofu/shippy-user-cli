@@ -28,16 +28,19 @@ func main() {
 		Name: "inicio",
 		Url:  "/dashboard",
 	})
+	println("Create menu 1", err)
 	r1, err := client.CreateMenu(context.TODO(), &pb.Menu{
 		Id:   "2",
 		Name: "inicio",
 		Url:  "/dashboard",
 	})
+	println("Create menu 2", err)
 	r2, err := client.CreateRole(context.TODO(), &pb.Role{
 		Id:     "2",
 		Name:   "admin",
 		Menues: []*pb.Menu{r.Menu, r1.Menu},
 	})
+	println("Create role 1", err)
 	name := "Ewan Valentine"
 	email := "ewan.valentine89@gmail.com"
 	password := "test123"
