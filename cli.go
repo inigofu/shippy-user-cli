@@ -1,81 +1,98 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"os"
 
+	"github.com/dgrijalva/jwt-go"
 	pb "github.com/inigofu/shippy-user-service/proto/auth"
-	micro "github.com/micro/go-micro"
-	microclient "github.com/micro/go-micro/client"
-	"golang.org/x/net/context"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
 )
+
+type CustomClaims struct {
+	User *pb.User
+	jwt.StandardClaims
+}
 
 func main() {
 
-	srv := micro.NewService(
-
-		micro.Name("go.micro.srv.user-cli"),
-		micro.Version("latest"),
+	// Creates a database connection and handles
+	// closing it again before exit.
+	host := "localhost:54321"
+	username := "postgres"
+	DBName := "postgres"
+	password := "postgres"
+	db, err := gorm.Open(
+		"postgres",
+		fmt.Sprintf(
+			"postgres://%s:%s@%s/%s?sslmode=disable",
+			username, password, host, DBName,
+		),
 	)
-
-	// Init will parse the command line flags.
-	srv.Init()
-
-	client := pb.NewAuthClient("go.micro.srv.user", microclient.DefaultClient)
-
-	r, err := client.CreateMenu(context.TODO(), &pb.Menu{
-		Id:   "1",
-		Name: "inicio",
-		Url:  "/dashboard",
-	})
-	println("Create menu 1", err.Error)
-	r1, err := client.CreateMenu(context.TODO(), &pb.Menu{
-		Id:   "2",
-		Name: "inicio",
-		Url:  "/dashboard",
-	})
-	println("Create menu 2", err.Error)
-	r2, err := client.CreateRole(context.TODO(), &pb.Role{
-		Id:     "2",
-		Name:   "admin",
-		Menues: []*pb.Menu{r.Menu, r1.Menu},
-	})
-	println("Create role 1", err)
-	name := "Ewan Valentine"
-	email := "ewan.valentine89@gmail.com"
-	password := "test123"
-	company := "BBC"
-	r3, err := client.Create(context.TODO(), &pb.User{
-		Name:     name,
-		Email:    email,
-		Password: password,
-		Company:  company,
-		Roles:    []*pb.Role{r2.Role},
-	})
-	if err != nil {
-		log.Fatalf("Could not create: %v", err)
-	}
-	log.Printf("Created: %s", r3.User.Id)
-
-	getAll, err := client.GetAll(context.Background(), &pb.Request{})
-	if err != nil {
-		log.Fatalf("Could not list users: %v", err)
-	}
-	for _, v := range getAll.Users {
-		log.Println(v)
-	}
-
-	authResponse, err := client.Auth(context.TODO(), &pb.User{
-		Email:    email,
-		Password: password,
-	})
+	defer db.Close()
 
 	if err != nil {
-		log.Fatalf("Could not authenticate user: %s error: %v\n", email, err)
+		log.Fatalf("Could not connect to DB: %v", err)
+	}
+	// db.LogMode(true)
+
+	user := &pb.User{}
+	//var roles []*pb.Role
+	var menues []*pb.Menu
+	var rolmenuesall []*pb.Menu
+	email := "martin4"
+	if err := db.Preload("Roles.Menues").Select("id").Where("email = ?", email).
+		First(&user).Error; err != nil {
+		fmt.Println("errp", err)
 	}
 
-	log.Printf("Your access token is: %s \n", authResponse.Token)
+	for _, role := range user.Roles {
+		rolmenuesall = append(rolmenuesall, role.Menues...)
+	}
+	var rolmenues []string
+	for _, role := range rolmenuesall {
+		rolmenues = append(rolmenues, role.Id)
+	}
+	type Result struct {
+		Children_id string
+	}
+	// fmt.Println(rolmenues)
+	var results []Result
+	var childrenid []string
+	db.Raw("SELECT children_id FROM menu_childrens").Scan(&results)
+	for _, result := range results {
+		childrenid = append(childrenid, result.Children_id)
+	}
+	// (*sql.Row)
+	// fmt.Println(childrenid)
+	if err := db.Not(childrenid).Where(rolmenues).Preload("Children", "id in (?)", rolmenues).Find(&menues).Error; err != nil {
+		fmt.Println("errp 2", err)
+	}
+	// fmt.Println(menues)
 
-	// let's just exit because
-	os.Exit(0)
+	key := []byte("mySuperSecretKeyLol")
+	claims := CustomClaims{
+		user,
+		jwt.StandardClaims{
+			ExpiresAt: 24,
+			Issuer:    "shippy.user",
+		},
+	}
+	fmt.Println("start token")
+	// Create token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenString, err := token.SignedString(key)
+	fmt.Println("token", tokenString)
+	token2, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return key, nil
+	})
+	fmt.Println(token2)
+	// Validate the token and return the custom claims
+	if claims, ok := token2.Claims.(*CustomClaims); ok && token2.Valid {
+		fmt.Println(claims)
+	} else {
+		fmt.Println(err)
+	}
 }
